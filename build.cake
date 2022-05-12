@@ -1,10 +1,13 @@
 public record BuildData(
     DirectoryPath SourcePath,
     string Configuration,
-    DirectoryPath ArtifactsPath
+    DirectoryPath ArtifactsPath,
+    string Version
 )
 {
-    public DotNetMSBuildSettings MSBuildSettings { get; } = new DotNetMSBuildSettings()
+    public DotNetMSBuildSettings MSBuildSettings { get; } = new DotNetMSBuildSettings{
+        Version = Version
+    }
                                         .SetConfiguration(Configuration);
 }
 
@@ -13,7 +16,10 @@ Setup(
     context => new BuildData(
         "./src",
         "Release",
-        "./artifacts"
+        "./artifacts",
+        GitHubActions.IsRunningOnGitHubActions
+            ? FormattableString.Invariant($"{DateTime.Now:yyyy.MM.dd}.{GitHubActions.Environment.Workflow.RunNumber}")
+            : "1.0.0.0"
         )
 );
 
@@ -69,7 +75,10 @@ Task("Package")
 Task("Publish")
     .IsDependentOn("Package")
     .Does<BuildData>(
-        (context, data)=>GitHubActions.Commands.UploadArtifact(data.ArtifactsPath, "HelloWorld"));
+        (context, data)=> GitHubActions.Commands.UploadArtifact(
+            data.ArtifactsPath,
+            $"HelloWorld{Context.Environment.Platform.Family}"
+            ));
 
 Task("Default")
     .IsDependentOn("Package");
